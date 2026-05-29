@@ -15,16 +15,29 @@
   <body>
     <div class="bg-glow"></div>
     <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">É</span>
+          <span>ErettsegiMaster</span>
+        </div>
+        <nav>
+          <a href="#generate">Generálás</a>
+          <a href="#profil">Profil</a>
+          <a href="#korabbi">Korábbi feladatsorok</a>
+        </nav>
+      </header>
+
       <section class="hero">
-        <p class="badge">2027 SMART PREP</p>
-        <h1>ErettsegiMaster</h1>
+        <p class="badge">2027 ÉRETTSÉGI FELKÉSZÍTŐ</p>
+        <h1>Készülj az érettségire stílusosan.</h1>
         <p class="subtitle">
-          Lenyűgöző érettségi felkészítő platform matek, irodalom, történelem és német
-          tantárgyakhoz. Minden kattintásra új, teljes gyakorlófeladatsor.
+          Lenyűgöző felkészítő platform matek, irodalom, történelem és német
+          tantárgyakhoz. Minden kattintásra új, teljes gyakorlófeladatsor — időzített
+          próbamóddal, automatikus pontozással és haladáskövetéssel.
         </p>
       </section>
 
-      <section class="controls card">
+      <section class="controls card" id="generate">
         <div>
           <label for="subject">Tantárgy</label>
           <select id="subject">
@@ -52,8 +65,8 @@
         <article class="card stat"><p>Összes pontszázalék</p><h3 id="overallPercent">0%</h3></article>
       </section>
 
-      <section class="card profile-panel">
-        <h2>Tanulási profil és haladás</h2>
+      <section class="card profile-panel" id="profil">
+        <div class="section-title"><span class="dot"></span><h2>Tanulási profil és haladás</h2></div>
         <div class="profile-grid">
           <div>
             <label for="profileName">Név</label>
@@ -87,7 +100,7 @@
         </div>
       </section>
 
-      <section class="card past-panel">
+      <section class="card past-panel" id="korabbi">
         <div class="exam-header">
           <h2>Korábbi érettségi feladatsor-import (Oktatási Hivatal)</h2>
           <button id="refreshPastBtn" class="ghost">Lista frissítése</button>
@@ -96,6 +109,10 @@
           <p class="empty">Még nincs betöltve a feladatsorlista.</p>
         </div>
       </section>
+
+      <footer>
+        ErettsegiMaster 2027 — készülj magabiztosan. Sok sikert az érettségin!
+      </footer>
     </main>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>

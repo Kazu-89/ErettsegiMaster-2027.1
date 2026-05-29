@@ -17,6 +17,7 @@ $git = "C:\Program Files\Git\cmd\git.exe"
 if (-not (Test-Path $git)) { $git = "git" }
 
 $python = "python"
+$node = "node"
 
 # Projekt gyoker (a script a .cursor/hooks mappaban van)
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
@@ -36,6 +37,21 @@ $pyFiles = Get-ChildItem -Path $projectRoot -Recurse -Filter *.py -File |
 $errors = @()
 foreach ($file in $pyFiles) {
     $output = & $python -m py_compile $file.FullName 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $errors += "$($file.Name): $output"
+    }
+}
+
+# --- Hibaellenorzes: minden .js fajl szintaktikai ellenorzese Node-dal ---
+$jsFiles = Get-ChildItem -Path $projectRoot -Recurse -Filter *.js -File |
+    Where-Object {
+        $_.FullName -notmatch '\\node_modules\\' -and
+        $_.FullName -notmatch '\\\.venv\\' -and
+        $_.FullName -notmatch '\\data\\'
+    }
+
+foreach ($file in $jsFiles) {
+    $output = & $node --check $file.FullName 2>&1
     if ($LASTEXITCODE -ne 0) {
         $errors += "$($file.Name): $output"
     }
