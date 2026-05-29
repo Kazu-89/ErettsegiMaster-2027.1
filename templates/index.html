@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ErettsegiMaster 2027</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="badge">2027 SMART PREP</p>
+        <h1>ErettsegiMaster</h1>
+        <p class="subtitle">
+          Lenyűgöző érettségi felkészítő platform matek, irodalom, történelem és német
+          tantárgyakhoz. Minden kattintásra új, teljes gyakorlófeladatsor.
+        </p>
+      </section>
+
+      <section class="controls card">
+        <div>
+          <label for="subject">Tantárgy</label>
+          <select id="subject">
+            {% for key, val in subjects.items() %}
+            <option value="{{ key }}">{{ val }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="level">Szint</label>
+          <select id="level">
+            <option value="kozep">Középszint</option>
+            <option value="emelt">Emelt szint</option>
+          </select>
+        </div>
+        <button id="generateBtn">Feladatsor generálása</button>
+      </section>
+
+      <section class="stats-grid">
+        <article class="card stat"><p>Elkészült feladatsorok</p><h3 id="setCount">0</h3></article>
+        <article class="card stat"><p>Összpontszám ebben a sorban</p><h3 id="totalPoints">0</h3></article>
+        <article class="card stat"><p>Becsült idő</p><h3 id="minutes">0 perc</h3></article>
+        <article class="card stat"><p>Időzítő</p><h3 id="timer">--:--</h3></article>
+        <article class="card stat"><p>Profil név</p><h3 id="profileNameView">Diák</h3></article>
+        <article class="card stat"><p>Összes pontszázalék</p><h3 id="overallPercent">0%</h3></article>
+      </section>
+
+      <section class="card profile-panel">
+        <h2>Tanulási profil és haladás</h2>
+        <div class="profile-grid">
+          <div>
+            <label for="profileName">Név</label>
+            <input id="profileName" type="text" placeholder="Neved" />
+          </div>
+          <div>
+            <label for="targetYear">Célév</label>
+            <input id="targetYear" type="number" min="2026" max="2035" value="2027" />
+          </div>
+          <div>
+            <label for="streak">Tanulási streak (nap)</label>
+            <input id="streak" type="number" min="0" max="365" value="0" />
+          </div>
+          <button id="saveProfileBtn">Profil mentése</button>
+        </div>
+      </section>
+
+      <section class="card exam-panel">
+        <div class="exam-header">
+          <h2 id="examTitle">Még nincs feladatsor</h2>
+          <div class="actions">
+            <button id="startMockBtn" class="ghost">Próbaérettségi indítása</button>
+            <button id="toggleSolutionsBtn" class="ghost">Mintamegoldások mutatása</button>
+            <button id="scoreBtn" class="ghost">Automatikus pontozás</button>
+            <button id="pdfBtn" class="ghost">PDF export</button>
+          </div>
+        </div>
+        <div id="scoreSummary" class="score-summary hidden"></div>
+        <div id="tasks" class="tasks">
+          <p class="empty">Válassz tantárgyat és szintet, majd generálj egy új gyakorlófeladatsort.</p>
+        </div>
+      </section>
+
+      <section class="card past-panel">
+        <div class="exam-header">
+          <h2>Korábbi érettségi feladatsor-import (Oktatási Hivatal)</h2>
+          <button id="refreshPastBtn" class="ghost">Lista frissítése</button>
+        </div>
+        <div id="pastExams" class="tasks">
+          <p class="empty">Még nincs betöltve a feladatsorlista.</p>
+        </div>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
