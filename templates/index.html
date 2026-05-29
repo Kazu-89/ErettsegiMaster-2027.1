@@ -123,6 +123,31 @@
         </div>
       </section>
 
+      <section class="card oral-panel" id="elo-szobeli">
+        <div class="exam-header">
+          <div class="section-title"><span class="dot"></span><h2>Élő szóbeli vizsga (15 perc, mikrofonnal)</h2></div>
+          <div class="actions">
+            <button id="oralStartBtn" class="ghost">🎤 Vizsga indítása</button>
+            <button id="oralStopBtn" class="ghost" disabled>Befejezés és elemzés</button>
+          </div>
+        </div>
+        <p class="meta" id="oralStatus">
+          A rendszer véletlenszerűen kihúz egy hiteles tételt, indít egy 15 perces visszaszámlálót, és
+          mikrofonon keresztül rögzíti a feleletedet. Befejezéskor elemzi a tartalmat, a szókincset és az
+          időgazdálkodást. (Chrome vagy Edge böngésző szükséges a mikrofonos felismeréshez.)
+        </p>
+        <div class="oral-live hidden" id="oralLive">
+          <div class="oral-meta">
+            <span>Hátralévő idő: <strong id="oralTimer">15:00</strong></span>
+            <span id="oralRecState" class="rec-dot">● felvétel</span>
+          </div>
+          <div id="oralTicket" class="oral-ticket"></div>
+          <h4>Élő leirat</h4>
+          <div id="oralTranscript" class="oral-transcript"></div>
+        </div>
+        <div id="oralAnalysis" class="analysis-box hidden"></div>
+      </section>
+
       <section class="card past-panel" id="korabbi">
         <div class="exam-header">
           <h2>Korábbi érettségi feladatsor-import (Oktatási Hivatal)</h2>

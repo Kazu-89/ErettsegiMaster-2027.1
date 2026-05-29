@@ -66,6 +66,116 @@ def _normalize_text(content: str) -> list[str]:
     return re.findall(r"[a-z0-9]{3,}", ascii_text)
 
 
+def analyze_response(
+    expected_text: str,
+    response_text: str,
+    timing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Tartalmi, szókincsbeli és (szóbelinél) időbeli elemzés egy válaszról.
+
+    A `timing` szótár (csak szóbelinél) kulcsai:
+      duration_sec, first_word_delay_sec, long_pause_count, silence_sec
+    """
+    expected = set(_normalize_text(expected_text))
+    words = _normalize_text(response_text)
+    word_count = len(words)
+    unique_words = len(set(words))
+
+    coverage = round(len(expected & set(words)) / max(len(expected), 1) * 100, 1)
+    vocab_richness = round(unique_words / word_count * 100, 1) if word_count else 0.0
+
+    recommendations: list[str] = []
+    strengths: list[str] = []
+
+    # --- Tartalom ---
+    if word_count == 0:
+        recommendations.append("Nem érkezett értékelhető válasz – próbáld újra, és beszélj/írj bővebben.")
+    elif coverage >= 65:
+        strengths.append("Tartalom: a kulcsfogalmak nagy részét érintetted – alapos tudás.")
+    elif coverage >= 35:
+        recommendations.append(
+            "Tartalom: a téma kulcsfogalmainak csak egy részét említetted – mélyítsd a tudásod, "
+            "használj több pontos szakkifejezést és konkrét példát."
+        )
+    else:
+        recommendations.append(
+            "Tartalom: kevés lényegi fogalom jelent meg – úgy tűnik, a téma alaposabb átismétlése szükséges "
+            "(definíciók, nevek, évszámok, összefüggések)."
+        )
+
+    # --- Szókincs ---
+    if word_count >= 40:
+        if vocab_richness < 42:
+            recommendations.append(
+                "Szókincs: sok a szóismétlés – bővítsd a szókincsed, használj szinonimákat és változatosabb "
+                "kifejezéseket."
+            )
+        elif vocab_richness >= 60:
+            strengths.append("Szókincs: gazdag és változatos szóhasználat.")
+
+    # --- Terjedelem ---
+    short_threshold = 110 if timing else 70
+    if 0 < word_count < short_threshold:
+        recommendations.append(
+            "Terjedelem: túl rövid a kifejtés – fejtsd ki bővebben, több gondolattal és példával."
+        )
+
+    metrics: dict[str, Any] = {
+        "coverage_percent": coverage,
+        "word_count": word_count,
+        "vocab_richness_percent": vocab_richness,
+    }
+
+    # --- Időgazdálkodás (csak szóbeli) ---
+    if timing:
+        duration = max(float(timing.get("duration_sec", 0)), 0.0)
+        first_delay = max(float(timing.get("first_word_delay_sec", 0)), 0.0)
+        pauses = int(timing.get("long_pause_count", 0))
+        silence = max(float(timing.get("silence_sec", 0)), 0.0)
+        active = max(duration - silence, 1.0)
+        rate = round(word_count / (active / 60.0), 1) if word_count else 0.0
+
+        metrics.update(
+            {
+                "duration_sec": round(duration, 1),
+                "first_word_delay_sec": round(first_delay, 1),
+                "long_pause_count": pauses,
+                "silence_sec": round(silence, 1),
+                "speaking_rate_wpm": rate,
+            }
+        )
+
+        if first_delay > 15:
+            recommendations.append(
+                f"Időgazdálkodás: a kezdés előtt {round(first_delay)} másodpercig tétováztál – "
+                "kezdj egy bevezető mondattal, amíg rendezed a gondolataidat."
+            )
+        if pauses >= 4:
+            recommendations.append(
+                f"Folyamatosság: {pauses} hosszú szünet volt a beszédedben – ez időt veszteget; "
+                "használj töltelékmondatokat és gondolati átkötéseket."
+            )
+        if word_count and rate < 75:
+            recommendations.append(
+                "Beszédtempó: lassan haladtál (sok a holtidő) – gyakorold a folyamatos, magabiztos kifejtést."
+            )
+        elif rate > 185:
+            recommendations.append(
+                "Beszédtempó: nagyon gyorsan beszéltél – lassíts, hogy érthető és követhető maradj."
+            )
+        elif word_count:
+            strengths.append("Beszédtempó: jó, kiegyensúlyozott tempóban beszéltél.")
+
+    if not recommendations and word_count:
+        recommendations.append("Kiváló munka! Tartsd meg ezt a színvonalat, és gyakorolj változatos témákban.")
+
+    return {
+        "metrics": metrics,
+        "recommendations": recommendations,
+        "strengths": strengths,
+    }
+
+
 def score_exam(exam_payload: dict[str, Any], answers: list[str]) -> dict[str, Any]:
     task_results: list[dict[str, Any]] = []
     earned_total = 0
@@ -112,11 +222,21 @@ def score_exam(exam_payload: dict[str, Any], answers: list[str]) -> dict[str, An
         )
 
     percentage = round((earned_total / max_total) * 100, 1) if max_total else 0
+
+    tasks = exam_payload.get("tasks", [])
+    combined_expected = " ".join(
+        f"{t.get('title', '')} {t.get('topic', '')} {t.get('sample_solution', '')} {t.get('hint', '')}"
+        for t in tasks
+    )
+    combined_answer = " ".join(answers)
+    analysis = analyze_response(combined_expected, combined_answer)
+
     return {
         "earned_total": earned_total,
         "max_total": max_total,
         "percentage": percentage,
         "task_results": task_results,
+        "analysis": analysis,
     }
 
 
@@ -297,6 +417,38 @@ def score() -> Any:
     profile["history"] = profile["history"][-50:]
     _save_profile(profile)
     return jsonify(result)
+
+
+@app.post("/api/analyze-oral")
+def analyze_oral() -> Any:
+    payload = request.get_json(silent=True) or {}
+    transcript = payload.get("transcript", "")
+    expected = payload.get("expected_text", "")
+    subject = payload.get("subject", "matek")
+    if subject not in SUBJECTS:
+        subject = "matek"
+    timing = {
+        "duration_sec": payload.get("duration_sec", 0),
+        "first_word_delay_sec": payload.get("first_word_delay_sec", 0),
+        "long_pause_count": payload.get("long_pause_count", 0),
+        "silence_sec": payload.get("silence_sec", 0),
+    }
+    analysis = analyze_response(expected, transcript, timing=timing)
+
+    profile = _load_profile()
+    profile["history"].append(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "type": "oral_practice",
+            "subject": subject,
+            "coverage_percent": analysis["metrics"].get("coverage_percent", 0),
+            "word_count": analysis["metrics"].get("word_count", 0),
+            "speaking_rate_wpm": analysis["metrics"].get("speaking_rate_wpm", 0),
+        }
+    )
+    profile["history"] = profile["history"][-50:]
+    _save_profile(profile)
+    return jsonify(analysis)
 
 
 @app.post("/api/export/pdf")

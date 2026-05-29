@@ -118,10 +118,12 @@ const scoreCurrentExam = async () => {
     if (!response.ok) throw new Error("Pontozás sikertelen.");
     const result = await response.json();
     scoreSummaryEl.classList.remove("hidden");
-    scoreSummaryEl.innerHTML = `
-      <strong>Eredmény: ${result.earned_total} / ${result.max_total} pont (${result.percentage}%)</strong>
-      <p>${result.percentage >= 70 ? "Nagyon jó haladás!" : "Még van tér fejlődni, gyakorolj tovább."}</p>
-    `;
+    const header =
+      result.max_total > 0
+        ? `<strong>Eredmény: ${result.earned_total} / ${result.max_total} pont (${result.percentage}%)</strong>
+           <p>${result.percentage >= 70 ? "Nagyon jó haladás!" : "Még van tér fejlődni, gyakorolj tovább."}</p>`
+        : `<strong>Szóbeli gyakorlat – az alábbi részletes visszajelzést nézd át.</strong>`;
+    scoreSummaryEl.innerHTML = header + renderAnalysisHtml(result.analysis, false);
     await loadProfile();
   } catch (error) {
     scoreSummaryEl.classList.remove("hidden");
@@ -328,6 +330,251 @@ toggleSolutionsBtn.addEventListener("click", () => {
     ? "Mintamegoldások elrejtése"
     : "Mintamegoldások mutatása";
 });
+
+const renderAnalysisHtml = (analysis, isOral) => {
+  if (!analysis) return "";
+  const m = analysis.metrics || {};
+  const metricCards = [];
+  metricCards.push(
+    `<div class="metric"><span>Tartalmi lefedettség</span><strong>${m.coverage_percent ?? 0}%</strong></div>`
+  );
+  metricCards.push(
+    `<div class="metric"><span>Szókincs gazdagsága</span><strong>${m.vocab_richness_percent ?? 0}%</strong></div>`
+  );
+  metricCards.push(`<div class="metric"><span>Szavak száma</span><strong>${m.word_count ?? 0}</strong></div>`);
+  if (isOral) {
+    metricCards.push(
+      `<div class="metric"><span>Beszédtempó</span><strong>${m.speaking_rate_wpm ?? 0} szó/p</strong></div>`
+    );
+    metricCards.push(
+      `<div class="metric"><span>Tétovázás a kezdésnél</span><strong>${m.first_word_delay_sec ?? 0} mp</strong></div>`
+    );
+    metricCards.push(
+      `<div class="metric"><span>Hosszú szünetek</span><strong>${m.long_pause_count ?? 0}</strong></div>`
+    );
+  }
+
+  const recs = (analysis.recommendations || [])
+    .map((r) => `<li>${escapeHtml(r)}</li>`)
+    .join("");
+  const strengths = (analysis.strengths || [])
+    .map((s) => `<li>${escapeHtml(s)}</li>`)
+    .join("");
+
+  return `
+    <div class="metric-grid">${metricCards.join("")}</div>
+    ${strengths ? `<h4>Erősségek</h4><ul class="good">${strengths}</ul>` : ""}
+    ${recs ? `<h4>Min fejlődj?</h4><ul>${recs}</ul>` : ""}
+  `;
+};
+
+// ----- Élő szóbeli vizsga (Web Speech API) -----
+const oralStartBtn = document.getElementById("oralStartBtn");
+const oralStopBtn = document.getElementById("oralStopBtn");
+const oralStatusEl = document.getElementById("oralStatus");
+const oralLiveEl = document.getElementById("oralLive");
+const oralTimerEl = document.getElementById("oralTimer");
+const oralTicketEl = document.getElementById("oralTicket");
+const oralTranscriptEl = document.getElementById("oralTranscript");
+const oralAnalysisEl = document.getElementById("oralAnalysis");
+const oralRecStateEl = document.getElementById("oralRecState");
+
+const ORAL_DURATION_SEC = 15 * 60;
+const LONG_PAUSE_MS = 4000;
+
+const oral = {
+  recognition: null,
+  active: false,
+  timerHandle: null,
+  remaining: ORAL_DURATION_SEC,
+  exam: null,
+  finalTranscript: "",
+  startMs: 0,
+  firstWordMs: 0,
+  lastResultMs: 0,
+  longPauseCount: 0,
+  silenceMs: 0,
+};
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const buildTicketHtml = (exam) => {
+  const parts = exam.tasks
+    .map(
+      (t, i) => `
+      <div class="part">
+        <strong>${i + 1}. ${escapeHtml(t.title)}</strong>
+        <p>${escapeHtml(t.prompt)}</p>
+      </div>`
+    )
+    .join("");
+  return `<h3>Kihúzott tétel — ${escapeHtml(exam.subject_label)} (${escapeHtml(exam.mode_label)})</h3>${parts}`;
+};
+
+const expectedTextFromExam = (exam) =>
+  exam.tasks
+    .map((t) => `${t.title} ${t.topic} ${t.sample_solution} ${t.hint}`)
+    .join(" ");
+
+const formatMMSS = (sec) => {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+};
+
+const stopOralExam = async () => {
+  if (!oral.active) return;
+  oral.active = false;
+  if (oral.timerHandle) clearInterval(oral.timerHandle);
+  if (oral.recognition) {
+    try {
+      oral.recognition.stop();
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  oralRecStateEl.textContent = "■ leállítva";
+  oralStartBtn.disabled = false;
+  oralStopBtn.disabled = true;
+
+  const elapsed = (Date.now() - oral.startMs) / 1000;
+  const firstDelay = oral.firstWordMs ? (oral.firstWordMs - oral.startMs) / 1000 : elapsed;
+
+  oralAnalysisEl.classList.remove("hidden");
+  oralAnalysisEl.innerHTML = "<strong>Elemzés folyamatban...</strong>";
+
+  try {
+    const response = await fetch("/api/analyze-oral", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: oral.exam.subject,
+        transcript: oral.finalTranscript,
+        expected_text: expectedTextFromExam(oral.exam),
+        duration_sec: elapsed,
+        first_word_delay_sec: firstDelay,
+        long_pause_count: oral.longPauseCount,
+        silence_sec: oral.silenceMs / 1000,
+      }),
+    });
+    if (!response.ok) throw new Error("Elemzés sikertelen.");
+    const analysis = await response.json();
+    oralAnalysisEl.innerHTML =
+      `<strong>Szóbeli elemzés kész</strong>` + renderAnalysisHtml(analysis, true);
+    await loadProfile();
+  } catch (error) {
+    oralAnalysisEl.innerHTML = `<strong>Hiba:</strong> ${escapeHtml(error.message)}`;
+  }
+};
+
+const startOralExam = async () => {
+  if (!SpeechRecognition) {
+    oralStatusEl.textContent =
+      "Ez a böngésző nem támogatja a beszédfelismerést. Használj Google Chrome vagy Microsoft Edge böngészőt.";
+    return;
+  }
+
+  oralStartBtn.disabled = true;
+  oralAnalysisEl.classList.add("hidden");
+  oralAnalysisEl.innerHTML = "";
+
+  try {
+    const params = new URLSearchParams({
+      subject: subjectEl.value,
+      mode: "szobeli",
+      level: levelEl.value,
+    });
+    const response = await fetch(`/api/exam?${params.toString()}`);
+    if (!response.ok) throw new Error("Nem sikerült tételt húzni.");
+    oral.exam = await response.json();
+  } catch (error) {
+    oralStatusEl.textContent = `Hiba: ${error.message}`;
+    oralStartBtn.disabled = false;
+    return;
+  }
+
+  oral.active = true;
+  oral.finalTranscript = "";
+  oral.startMs = Date.now();
+  oral.firstWordMs = 0;
+  oral.lastResultMs = oral.startMs;
+  oral.longPauseCount = 0;
+  oral.silenceMs = 0;
+  oral.remaining = ORAL_DURATION_SEC;
+
+  oralLiveEl.classList.remove("hidden");
+  oralTicketEl.innerHTML = buildTicketHtml(oral.exam);
+  oralTranscriptEl.innerHTML = "";
+  oralTimerEl.textContent = formatMMSS(oral.remaining);
+  oralRecStateEl.textContent = "● felvétel";
+  oralStopBtn.disabled = false;
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = oral.exam.subject === "nemet" ? "de-DE" : "hu-HU";
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onresult = (event) => {
+    const now = Date.now();
+    if (!oral.firstWordMs) oral.firstWordMs = now;
+    const gap = now - oral.lastResultMs;
+    if (gap > LONG_PAUSE_MS) {
+      oral.longPauseCount += 1;
+      oral.silenceMs += gap;
+    }
+    oral.lastResultMs = now;
+
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const chunk = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        oral.finalTranscript += chunk + " ";
+      } else {
+        interim += chunk;
+      }
+    }
+    oralTranscriptEl.innerHTML =
+      escapeHtml(oral.finalTranscript) + `<span class="interim">${escapeHtml(interim)}</span>`;
+    oralTranscriptEl.scrollTop = oralTranscriptEl.scrollHeight;
+  };
+
+  recognition.onerror = (event) => {
+    if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      oralStatusEl.textContent = "A mikrofon-hozzáférés le lett tiltva. Engedélyezd a böngészőben!";
+    }
+  };
+
+  recognition.onend = () => {
+    // Ha még aktív (nem a diák állította le), indítsuk újra a folyamatos felvételhez.
+    if (oral.active) {
+      try {
+        recognition.start();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  };
+
+  oral.recognition = recognition;
+  try {
+    recognition.start();
+  } catch (e) {
+    /* ignore */
+  }
+
+  oral.timerHandle = setInterval(() => {
+    oral.remaining -= 1;
+    oralTimerEl.textContent = formatMMSS(Math.max(0, oral.remaining));
+    if (oral.remaining <= 0) {
+      stopOralExam();
+    }
+  }, 1000);
+};
+
+if (oralStartBtn) {
+  oralStartBtn.addEventListener("click", startOralExam);
+  oralStopBtn.addEventListener("click", stopOralExam);
+}
 
 generateBtn.addEventListener("click", generateExam);
 scoreBtn.addEventListener("click", scoreCurrentExam);
