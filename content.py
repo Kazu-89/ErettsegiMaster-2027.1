@@ -22,6 +22,8 @@ class Task:
     sample_solution: str
     source: str
     topic: str
+    # Nemet feladatoknal a prompt nemetul van, ez pedig a magyar forditas (kisebb betuvel jelenik meg).
+    prompt_hu: str = ""
 
 
 SUBJECTS = {
@@ -357,39 +359,47 @@ def _german_written(level: str) -> list[Task]:
     city = random.choice(["Berlin", "Wien", "München", "Hamburg"])
     pool = [
         Task("Leseverstehen",
-             "Olvass el egy kb. 250 szavas német szöveget, majd válaszolj 8 igaz-hamis és 4 kifejtős kérdésre!",
-             16, "Keresd a kulcsszavak szinonimáit a szövegben.",
+             "Lies einen Text von ca. 250 Wörtern und beantworte 8 Richtig/Falsch-Aufgaben sowie 4 offene Fragen!",
+             16, "Suche im Text nach Synonymen der Schlüsselwörter.",
              "Helyes információ-visszakeresés és nyelvi pontosság.",
-             "Német érettségi feladatszerkezete alapján", "Olvasott szöveg"),
-        Task("Sprachbausteine / Nyelvhelyesség",
-             "Egészítsd ki a hiányos német szöveget a megfelelő nyelvtani és lexikai elemekkel (15 hely)!",
-             15, "Figyelj az esetekre, igeidőkre és elöljárószókra.",
+             "Német érettségi feladatszerkezete alapján", "Olvasott szöveg",
+             "Olvass el egy kb. 250 szavas szöveget, majd válaszolj 8 igaz/hamis és 4 kifejtős kérdésre!"),
+        Task("Sprachbausteine",
+             "Ergänze den lückenhaften Text mit den passenden grammatischen und lexikalischen Elementen (15 Lücken)!",
+             15, "Achte auf Kasus, Zeitformen und Präpositionen.",
              "Pontos nyelvtani szerkezetek és kollokációk.",
-             "Korábbi nyelvhelyesség-feladat mintája", "Nyelvhelyesség"),
+             "Korábbi nyelvhelyesség-feladat mintája", "Nyelvhelyesség",
+             "Egészítsd ki a hiányos szöveget a megfelelő nyelvtani és lexikai elemekkel (15 hely)!"),
         Task("Hörverstehen",
-             "Hallott szöveg: jegyzetelj egy rádióinterjút a környezetvédelemről, írj 10 kulcspontot németül!",
-             12, "Rövid, információs mondatokban rögzíts.",
+             "Höre ein Radiointerview zum Thema Umweltschutz und notiere 10 Schlüsselpunkte auf Deutsch!",
+             12, "Notiere in kurzen, informativen Sätzen.",
              "Témánkénti csoportosítás, tömör fogalmazás.",
-             "Kompetenciaalapú hallásértés-feladat", "Hallott szöveg"),
+             "Kompetenciaalapú hallásértés-feladat", "Hallott szöveg",
+             "Hallgass meg egy rádióinterjút a környezetvédelemről, és írj 10 kulcspontot németül!"),
         Task("Schreiben – E-Mail",
-             f"Írj 140–170 szavas e-mailt egy {city}-i csereprogramról: érdeklődj szállásról, programokról, költségekről!",
-             18, "Megszólítás, világos bekezdések, udvarias zárás.",
+             f"Schreibe eine E-Mail (140–170 Wörter) über ein Austauschprogramm in {city}: "
+             "Frage nach Unterkunft, Programm und Kosten!",
+             18, "Anrede, klare Absätze, höfliche Schlussformel.",
              "Einleitung → Fragen (Unterkunft/Programm/Kosten) → Schlussformel.",
-             "Levélírás-feladat mintája", "Íráskészség"),
+             "Levélírás-feladat mintája", "Íráskészség",
+             f"Írj 140–170 szavas e-mailt egy {city}-i csereprogramról: érdeklődj a szállásról, "
+             "a programokról és a költségekről!"),
     ]
     if level == "emelt":
         pool.append(
             Task("Schreiben – Meinungsäußerung (emelt)",
-                 "Írj 200–250 szavas véleménykifejtő szöveget a közösségi média hatásairól!",
-                 20, "Tézis, érvek, példák, konklúzió – kohézív szerkezet.",
+                 "Verfasse einen Meinungstext (200–250 Wörter) über die Auswirkungen der sozialen Medien!",
+                 20, "These, Argumente, Beispiele, Fazit – kohärenter Aufbau.",
                  "Árnyalt érvelés, gazdag szókincs, helyes kötőszóhasználat.",
-                 "Emelt szintű íráskészség-feladat", "Íráskészség"))
+                 "Emelt szintű íráskészség-feladat", "Íráskészség",
+                 "Írj 200–250 szavas véleménykifejtő szöveget a közösségi média hatásairól!"))
         pool.append(
             Task("Sprachmittlung / Mediation (emelt)",
-                 "Foglalj össze németül egy magyar nyelvű, kb. 200 szavas cikket (90–120 szó)!",
-                 18, "Ne szó szerint fordíts: információt közvetíts célzottan.",
+                 "Fasse einen ungarischsprachigen Artikel von ca. 200 Wörtern auf Deutsch zusammen (90–120 Wörter)!",
+                 18, "Nicht wörtlich übersetzen, sondern gezielt Informationen vermitteln.",
                  "Tömör, pontos, koherens közvetítés.",
-                 "Emelt szintű közvetítési feladat", "Sprachmittlung"))
+                 "Emelt szintű közvetítési feladat", "Sprachmittlung",
+                 "Foglalj össze németül egy magyar nyelvű, kb. 200 szavas cikket (90–120 szó)!"))
     return _pick(pool, 5 if level == "emelt" else 4)
 
 
@@ -413,38 +423,45 @@ def _german_oral(level: str) -> list[Task]:
     dauer = "15 perc" if level == "kozep" else "20 perc"
 
     tasks = [
-        Task("1. Társalgás (Konversation)",
-             f"Bemelegítő beszélgetés a(z) „{thema1}” témában. Válaszolj a vizsgáztató kérdéseire németül! "
-             "(Ez a rész a vizsgán nem számít a pontozásba, de remek gyakorlás.)",
-             0, "Beszélj természetesen, egész mondatokban; kérdezz vissza, ha kell.",
+        Task("1. Konversation (Társalgás)",
+             f"Aufwärmgespräch zum Thema „{thema1}”. Beantworte die Fragen des Prüfers auf Deutsch! "
+             "(Dieser Teil wird nicht bewertet, ist aber eine gute Übung.)",
+             0, "Sprich natürlich, in ganzen Sätzen; frage nach, wenn nötig.",
              "Folyékony, természetes válaszok, megfelelő szókincs.",
-             f"Német szóbeli felépítése ({dauer})", "Konversation"),
+             f"Német szóbeli felépítése ({dauer})", "Konversation",
+             f"Bemelegítő beszélgetés a(z) „{thema1}” témában. Válaszolj a vizsgáztató kérdéseire németül!"),
     ]
     if level == "kozep":
         tasks.append(Task(
-            "2. Szerepjáték (Rollenspiel)",
-            "Játszd el a következő hétköznapi szituációt a vizsgáztatóval: információkérés egy "
-            "nyelviskolai tanfolyamról (ár, időpont, szint). Térj ki MINDEN megadott szempontra! "
-            "Fél perc felkészülési idő.",
-            0, "Minden megadott pontra reagálj, különben pontlevonás jár.",
+            "2. Rollenspiel (Szerepjáték)",
+            "Spiele mit dem Prüfer folgende Alltagssituation: Du erkundigst dich nach einem Sprachkurs "
+            "(Preis, Termin, Niveau). Gehe auf ALLE vorgegebenen Punkte ein! Eine halbe Minute Vorbereitungszeit.",
+            0, "Reagiere auf jeden vorgegebenen Punkt, sonst gibt es Punktabzug.",
             "Megfelelő udvariassági formák, célorientált párbeszéd, minden szempont lefedve.",
-            "Német középszintű szóbeli (2. feladat)", "Rollenspiel"))
+            "Német középszintű szóbeli (2. feladat)", "Rollenspiel",
+            "Játszd el a szituációt a vizsgáztatóval: érdeklődés egy nyelvtanfolyamról (ár, időpont, szint). "
+            "Térj ki MINDEN megadott szempontra! Fél perc felkészülési idő."))
     else:
         tasks.append(Task(
-            "2. Vita (Diskussion)",
-            "Fejtsd ki és védd meg a véleményed a következő állításról, reagálva a vizsgáztató érveire: "
-            "„Az online oktatás hosszú távon kiválthatja a hagyományos iskolát.” Fél perc felkészülés.",
-            0, "Érvelj és cáfolj; használj kötőszavakat (einerseits/andererseits, trotzdem).",
+            "2. Diskussion (Vita)",
+            "Äußere und verteidige deine Meinung zu folgender Aussage und reagiere auf die Argumente des Prüfers: "
+            "„Der Online-Unterricht kann langfristig die traditionelle Schule ersetzen.” Eine halbe Minute Vorbereitung.",
+            0, "Argumentiere und widerlege; nutze Konnektoren (einerseits/andererseits, trotzdem).",
             "Árnyalt érvelés, reagálás az ellenérvekre, gazdag nyelvi eszköztár.",
-            "Német emelt szintű szóbeli (2. feladat)", "Diskussion"))
+            "Német emelt szintű szóbeli (2. feladat)", "Diskussion",
+            "Fejtsd ki és védd meg a véleményed az állításról, reagálva a vizsgáztató érveire: "
+            "„Az online oktatás hosszú távon kiválthatja a hagyományos iskolát.” Fél perc felkészülés."))
 
     tasks.append(Task(
-        "3. Önálló témakifejtés (Thema)",
-        f"Fejtsd ki összefüggően a véleményed a(z) „{thema2}” témáról ({desc2}) 4 irányító szempont és egy "
-        "kép alapján. FONTOS: ez NEM képleírás – a kép csak kiindulópont a véleményalkotáshoz! Fél perc felkészülés.",
-        0, "Max. 1-2 mondat a képről, utána a téma problémái, a saját véleményed.",
+        "3. Thema (Önálló témakifejtés)",
+        f"Äußere zusammenhängend deine Meinung zum Thema „{thema2}” anhand von 4 Leitpunkten und eines Bildes. "
+        "WICHTIG: Das ist KEINE Bildbeschreibung – das Bild ist nur ein Ausgangspunkt für deine Meinung! "
+        "Eine halbe Minute Vorbereitung.",
+        0, "Höchstens 1-2 Sätze zum Bild, danach die Probleme des Themas und deine eigene Meinung.",
         "Összefüggő, önálló kifejtés; ne betanult szöveg legyen; mind a 4 szempont jelenjen meg.",
-        "Német szóbeli (3. feladat) – kutatott felépítés alapján", "Thema"))
+        "Német szóbeli (3. feladat) – kutatott felépítés alapján", "Thema",
+        f"Fejtsd ki összefüggően a véleményed a(z) „{thema2}” témáról ({desc2}) 4 irányító szempont és egy kép "
+        "alapján. FONTOS: ez NEM képleírás – a kép csak kiindulópont a véleményalkotáshoz!"))
     return tasks
 
 

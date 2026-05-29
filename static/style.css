@@ -297,6 +297,14 @@ button.ghost:hover {
   line-height: 1.55;
 }
 
+.prompt-hu {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.85;
+}
+
 .task-head {
   display: flex;
   justify-content: space-between;

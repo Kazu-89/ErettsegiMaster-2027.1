@@ -91,6 +91,7 @@ const renderTasks = (exam) => {
           <strong>${pointLabel}</strong>
         </div>
         <p>${escapeHtml(task.prompt)}</p>
+        ${task.prompt_hu ? `<p class="prompt-hu">${escapeHtml(task.prompt_hu)}</p>` : ""}
         <textarea class="answer-box" data-answer-index="${idx}" placeholder="${answerLabel}"></textarea>
         <div class="meta"><strong>Tipp:</strong> ${escapeHtml(task.hint)}</div>
         <div class="meta"><strong>Forrás:</strong> ${escapeHtml(task.source)}</div>
@@ -405,6 +406,7 @@ const buildTicketHtml = (exam) => {
       <div class="part">
         <strong>${i + 1}. ${escapeHtml(t.title)}</strong>
         <p>${escapeHtml(t.prompt)}</p>
+        ${t.prompt_hu ? `<p class="prompt-hu">${escapeHtml(t.prompt_hu)}</p>` : ""}
       </div>`
     )
     .join("");
