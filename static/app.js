@@ -8,6 +8,7 @@ const state = {
 };
 
 const subjectEl = document.getElementById("subject");
+const modeEl = document.getElementById("mode");
 const levelEl = document.getElementById("level");
 const generateBtn = document.getElementById("generateBtn");
 const examTitleEl = document.getElementById("examTitle");
@@ -57,34 +58,46 @@ const startTimer = (minutes) => {
   }, 1000);
 };
 
+const escapeHtml = (text) =>
+  String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
 const renderTasks = (exam) => {
   state.currentExam = exam;
+  const isOral = exam.mode === "szobeli";
   examTitleEl.textContent = exam.title;
-  const totalPoints = exam.tasks.reduce((sum, t) => sum + t.max_points, 0);
-  totalPointsEl.textContent = String(totalPoints);
+  const totalPoints = exam.tasks.reduce((sum, t) => sum + (t.max_points || 0), 0);
+  totalPointsEl.textContent = isOral ? "szóbeli" : String(totalPoints);
   minutesEl.textContent = `${exam.estimated_minutes} perc`;
   setCountEl.textContent = String(state.generatedCount);
 
   tasksEl.classList.toggle("show-solutions", state.showSolutions);
   tasksEl.innerHTML = exam.tasks
-    .map(
-      (task, idx) => `
+    .map((task, idx) => {
+      const pointLabel = task.max_points > 0 ? `${task.max_points} pont` : "szóbeli";
+      const answerLabel = isOral
+        ? "Vázlat / jegyzeteid a feleletedhez..."
+        : "Ide írd a válaszodat...";
+      const solutionLabel = isOral ? "Elvárás / értékelési szempont" : "Mintamegoldás";
+      return `
       <article class="task">
         <div class="task-head">
           <div>
-            <h3>${idx + 1}. ${task.title}</h3>
-            <span class="pill">${task.topic}</span>
+            <h3>${idx + 1}. ${escapeHtml(task.title)}</h3>
+            <span class="pill">${escapeHtml(task.topic)}</span>
           </div>
-          <strong>${task.max_points} pont</strong>
+          <strong>${pointLabel}</strong>
         </div>
-        <p>${task.prompt}</p>
-        <textarea class="answer-box" data-answer-index="${idx}" placeholder="Ide írd a válaszodat..."></textarea>
-        <div class="meta"><strong>Tipp:</strong> ${task.hint}</div>
-        <div class="meta"><strong>Forrás:</strong> ${task.source}</div>
-        <div class="solution"><strong>Mintamegoldás:</strong> ${task.sample_solution}</div>
+        <p>${escapeHtml(task.prompt)}</p>
+        <textarea class="answer-box" data-answer-index="${idx}" placeholder="${answerLabel}"></textarea>
+        <div class="meta"><strong>Tipp:</strong> ${escapeHtml(task.hint)}</div>
+        <div class="meta"><strong>Forrás:</strong> ${escapeHtml(task.source)}</div>
+        <div class="solution"><strong>${solutionLabel}:</strong> ${escapeHtml(task.sample_solution)}</div>
       </article>
-    `
-    )
+    `;
+    })
     .join("");
 };
 
@@ -136,24 +149,103 @@ const exportPdf = async () => {
   URL.revokeObjectURL(url);
 };
 
+const SUBJECT_LABELS = {
+  matek: "Matek",
+  irodalom: "Irodalom",
+  tortenelem: "Történelem",
+  nemet: "Német",
+};
+
+const charts = { overall: null, subject: null };
+
+const computeOverall = (profile) =>
+  Object.values(profile.subject_stats || {}).reduce(
+    (acc, stat) => {
+      acc.max += stat.max || 0;
+      acc.earned += stat.earned || 0;
+      return acc;
+    },
+    { max: 0, earned: 0 }
+  );
+
+const updateCharts = (profile) => {
+  if (typeof Chart === "undefined") return;
+
+  const overall = computeOverall(profile);
+  const earned = overall.earned;
+  const remaining = Math.max(overall.max - overall.earned, 0);
+
+  if (charts.overall) {
+    charts.overall.data.datasets[0].data = [earned, remaining];
+    charts.overall.update();
+  } else {
+    charts.overall = new Chart(document.getElementById("overallChart"), {
+      type: "doughnut",
+      data: {
+        labels: ["Megszerzett pont", "Hátralévő"],
+        datasets: [
+          {
+            data: [earned, remaining],
+            backgroundColor: ["#ff3b57", "#3a1418"],
+            borderColor: "#150406",
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: "#c89aa0" } } },
+      },
+    });
+  }
+
+  const keys = Object.keys(SUBJECT_LABELS);
+  const percents = keys.map((key) => {
+    const stat = (profile.subject_stats || {})[key] || { earned: 0, max: 0 };
+    return stat.max ? Math.round((stat.earned / stat.max) * 1000) / 10 : 0;
+  });
+
+  if (charts.subject) {
+    charts.subject.data.datasets[0].data = percents;
+    charts.subject.update();
+  } else {
+    charts.subject = new Chart(document.getElementById("subjectChart"), {
+      type: "bar",
+      data: {
+        labels: keys.map((key) => SUBJECT_LABELS[key]),
+        datasets: [
+          {
+            label: "Pontszázalék (%)",
+            data: percents,
+            backgroundColor: "#e02440",
+            borderRadius: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, max: 100, ticks: { color: "#c89aa0" }, grid: { color: "#2a1014" } },
+          x: { ticks: { color: "#c89aa0" }, grid: { display: false } },
+        },
+        plugins: { legend: { labels: { color: "#c89aa0" } } },
+      },
+    });
+  }
+};
+
 const renderProfile = (profile) => {
   state.profile = profile;
   profileNameEl.value = profile.name || "";
   targetYearEl.value = profile.target_year || 2027;
   streakEl.value = profile.streak_days || 0;
   profileNameViewEl.textContent = profile.name || "Diák";
-  const overall =
-    profile.subject_stats &&
-    Object.values(profile.subject_stats).reduce(
-      (acc, stat) => {
-        acc.max += stat.max || 0;
-        acc.earned += stat.earned || 0;
-        return acc;
-      },
-      { max: 0, earned: 0 }
-    );
-  const percent = overall && overall.max ? ((overall.earned / overall.max) * 100).toFixed(1) : "0.0";
+  const overall = computeOverall(profile);
+  const percent = overall.max ? ((overall.earned / overall.max) * 100).toFixed(1) : "0.0";
   overallPercentEl.textContent = `${percent}%`;
+  updateCharts(profile);
 };
 
 const loadProfile = async () => {
@@ -208,6 +300,7 @@ const generateExam = async () => {
   try {
     const params = new URLSearchParams({
       subject: subjectEl.value,
+      mode: modeEl.value,
       level: levelEl.value,
     });
     const response = await fetch(`/api/exam?${params.toString()}`);

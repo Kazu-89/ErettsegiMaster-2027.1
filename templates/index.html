@@ -11,6 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   </head>
   <body>
     <div class="bg-glow"></div>
@@ -29,7 +30,7 @@
 
       <section class="hero">
         <p class="badge">2027 ÉRETTSÉGI FELKÉSZÍTŐ</p>
-        <h1>Készülj az érettségire stílusosan.</h1>
+        <h1>Készülj az érettségire <span class="accent">stílusosan</span>.</h1>
         <p class="subtitle">
           Lenyűgöző felkészítő platform matek, irodalom, történelem és német
           tantárgyakhoz. Minden kattintásra új, teljes gyakorlófeladatsor — időzített
@@ -42,6 +43,14 @@
           <label for="subject">Tantárgy</label>
           <select id="subject">
             {% for key, val in subjects.items() %}
+            <option value="{{ key }}">{{ val }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="mode">Vizsgarész</label>
+          <select id="mode">
+            {% for key, val in modes.items() %}
             <option value="{{ key }}">{{ val }}</option>
             {% endfor %}
           </select>
@@ -63,6 +72,20 @@
         <article class="card stat"><p>Időzítő</p><h3 id="timer">--:--</h3></article>
         <article class="card stat"><p>Profil név</p><h3 id="profileNameView">Diák</h3></article>
         <article class="card stat"><p>Összes pontszázalék</p><h3 id="overallPercent">0%</h3></article>
+      </section>
+
+      <section class="card charts-panel" id="grafikonok">
+        <div class="section-title"><span class="dot"></span><h2>Élő haladás-grafikonok</h2></div>
+        <div class="charts-grid">
+          <div class="chart-box">
+            <h4>Összesített teljesítmény</h4>
+            <canvas id="overallChart"></canvas>
+          </div>
+          <div class="chart-box">
+            <h4>Pontszázalék tantárgyanként</h4>
+            <canvas id="subjectChart"></canvas>
+          </div>
+        </div>
       </section>
 
       <section class="card profile-panel" id="profil">
