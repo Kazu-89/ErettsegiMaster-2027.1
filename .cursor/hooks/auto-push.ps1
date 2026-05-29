@@ -1,11 +1,14 @@
 # Automatikus GitHub push hook.
 # Amikor az agent befejez egy munkat, ez a script commitol es feltolti a valtozasokat,
 # de CSAK akkor, ha tenylegesen volt modositas.
+#
+# Megjegyzes: a git a normal informacios uzeneteit a stderr-re irja, ezert NEM
+# allitunk be "Stop" hibakezelest, kulonben a sikeres push is hibanak latszana.
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # stdin JSON beolvasasa (a stop hook kuld adatot, de itt nem hasznaljuk)
-$null = [Console]::In.ReadToEnd()
+try { $null = [Console]::In.ReadToEnd() } catch {}
 
 $git = "C:\Program Files\Git\cmd\git.exe"
 if (-not (Test-Path $git)) {
@@ -24,8 +27,8 @@ if (-not $changes) {
 }
 
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
-& $git add -A
-& $git commit -m "auto: kod frissitese Cursorbol ($timestamp)" | Out-Null
+& $git add -A 2>&1 | Out-Null
+& $git commit -m "auto: kod frissitese Cursorbol ($timestamp)" 2>&1 | Out-Null
 & $git push 2>&1 | Out-Null
 
 Write-Output '{}'
